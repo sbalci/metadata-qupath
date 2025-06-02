@@ -19,8 +19,6 @@ import java.awt.image.BufferedImage
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
-import groovy.json.JsonBuilder
-import groovy.json.JsonSlurper
 import java.nio.file.Paths
 import java.util.regex.Pattern
 
@@ -28,8 +26,8 @@ import java.util.regex.Pattern
 class CohortConfig {
     static final String OUTPUT_DIR = "cohort_metadata"
     static final String CSV_FILENAME = "cohort_metadata.csv"
-    static final String JSON_FILENAME = "cohort_metadata.json"
-    static final boolean INCLUDE_THUMBNAILS = true
+    static final String SUMMARY_FILENAME = "extraction_summary.txt"
+    static final boolean INCLUDE_THUMBNAILS = false
     static final int THUMBNAIL_SIZE = 512
 }
 
@@ -92,7 +90,13 @@ class CohortMetadataExtractor {
     private void extractImageProperties() {
         if (!server) return
         
-        metadata.image_type = server.getImageType()?.toString() ?: "Unknown"
+        // Use getImageClass() instead of getImageType() for QuPath 0.6+
+        try {
+            metadata.image_type = server.getImageClass()?.toString() ?: "Unknown"
+        } catch (Exception e) {
+            metadata.image_type = "Unknown"
+        }
+        
         metadata.width_pixels = server.getWidth()
         metadata.height_pixels = server.getHeight()
         metadata.num_channels = server.nChannels()
@@ -345,7 +349,7 @@ class CohortBatchProcessor {
         }
         
         exportToCSV()
-        exportToJSON()
+        exportSummary()
         exportProcessingLog()
         
         println("Results exported to: ${outputDir.getAbsolutePath()}")
@@ -382,25 +386,40 @@ class CohortBatchProcessor {
         }
     }
     
-    private void exportToJSON() {
-        def jsonFile = new File(outputDir, CohortConfig.JSON_FILENAME)
+    private void exportSummary() {
+        def summaryFile = new File(outputDir, CohortConfig.SUMMARY_FILENAME)
         
         try {
-            def json = new JsonBuilder()
-            json {
-                export_info {
-                    date new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())
-                    qupath_version GeneralTools.getVersion()
-                    project_name project?.getName() ?: "Unknown"
-                    total_images allMetadata.size()
+            summaryFile.withWriter { writer ->
+                writer.writeLine("Cohort Metadata Extraction Summary")
+                writer.writeLine("Generated: ${new SimpleDateFormat('yyyy-MM-dd HH:mm:ss').format(new Date())}")
+                writer.writeLine("QuPath Version: ${GeneralTools.getVersion()}")
+                writer.writeLine("Project: ${project?.getName() ?: 'Unknown'}")
+                writer.writeLine("Total Images: ${allMetadata.size()}")
+                writer.writeLine("=" * 50)
+                
+                // Calculate summary statistics
+                def scanners = allMetadata.collect { it.scanner }.findAll { it }.unique()
+                def avgWidth = allMetadata.collect { it.width_pixels }.findAll { it }.sum() / allMetadata.size()
+                def avgHeight = allMetadata.collect { it.height_pixels }.findAll { it }.sum() / allMetadata.size()
+                def avgPixelSize = allMetadata.collect { it.pixel_width_um }.findAll { it && it > 0 }.sum() / 
+                                 allMetadata.collect { it.pixel_width_um }.findAll { it && it > 0 }.size()
+                
+                writer.writeLine("Summary Statistics:")
+                writer.writeLine("Scanners found: ${scanners.join(', ')}")
+                writer.writeLine("Average image size: ${Math.round(avgWidth)} x ${Math.round(avgHeight)} pixels")
+                writer.writeLine("Average pixel size: ${String.format('%.3f', avgPixelSize)} μm")
+                
+                // File format distribution
+                def formats = allMetadata.collect { it.file_extension }.findAll { it }.countBy { it }
+                writer.writeLine("File formats:")
+                formats.each { format, count ->
+                    writer.writeLine("  ${format}: ${count} files")
                 }
-                cohort_metadata allMetadata
             }
-            
-            jsonFile.text = json.toPrettyString()
-            println("JSON exported: ${jsonFile.getAbsolutePath()}")
+            println("Summary exported: ${summaryFile.getAbsolutePath()}")
         } catch (Exception e) {
-            println("Error exporting JSON: ${e.getMessage()}")
+            println("Error exporting summary: ${e.getMessage()}")
         }
     }
     
@@ -437,7 +456,7 @@ Output directory: ${outputDir.getAbsolutePath()}
 
 Files generated:
 - ${CohortConfig.CSV_FILENAME} (for spreadsheet analysis)
-- ${CohortConfig.JSON_FILENAME} (for programmatic access)
+- ${CohortConfig.SUMMARY_FILENAME} (summary statistics)
 - processing_log.txt (detailed log)
 
 Next steps:
@@ -457,12 +476,43 @@ Next steps:
 class CohortUtils {
     
     /**
-     * Load cohort metadata from exported JSON file
+     * Load cohort metadata from exported CSV file
      */
-    static def loadCohortMetadata(String jsonPath) {
+    static def loadCohortMetadata(String csvPath) {
         try {
-            def jsonSlurper = new JsonSlurper()
-            return jsonSlurper.parse(new File(jsonPath))
+            def file = new File(csvPath)
+            if (!file.exists()) {
+                println("CSV file not found: ${csvPath}")
+                return null
+            }
+            
+            def lines = file.readLines()
+            if (lines.isEmpty()) return []
+            
+            def headers = lines[0].split(',')
+            def data = []
+            
+            for (int i = 1; i < lines.size(); i++) {
+                def values = lines[i].split(',')
+                def record = [:]
+                
+                for (int j = 0; j < headers.size() && j < values.size(); j++) {
+                    def header = headers[j].trim()
+                    def value = values[j].trim()
+                    
+                    // Try to convert numeric values
+                    if (value.isNumber()) {
+                        record[header] = value.contains('.') ? Double.parseDouble(value) : Long.parseLong(value)
+                    } else if (value.toLowerCase() == 'true' || value.toLowerCase() == 'false') {
+                        record[header] = Boolean.parseBoolean(value)
+                    } else {
+                        record[header] = value.isEmpty() ? null : value
+                    }
+                }
+                data.add(record)
+            }
+            
+            return data
         } catch (Exception e) {
             println("Error loading cohort metadata: ${e.getMessage()}")
             return null
@@ -473,9 +523,9 @@ class CohortUtils {
      * Filter images based on criteria
      */
     static def filterImages(def cohortData, Map<String, Object> criteria) {
-        if (!cohortData?.cohort_metadata) return []
+        if (!cohortData) return []
         
-        return cohortData.cohort_metadata.findAll { metadata ->
+        return cohortData.findAll { metadata ->
             criteria.every { key, value ->
                 def metadataValue = metadata[key]
                 if (value instanceof Number && metadataValue instanceof Number) {
@@ -501,12 +551,46 @@ class CohortUtils {
      * Get images by magnification range
      */
     static def getImagesByMagnification(def cohortData, int minMag, int maxMag) {
-        if (!cohortData?.cohort_metadata) return []
+        if (!cohortData) return []
         
-        return cohortData.cohort_metadata.findAll { metadata ->
+        return cohortData.findAll { metadata ->
             def mag = metadata.estimated_magnification
             return mag && mag >= minMag && mag <= maxMag
         }
+    }
+    
+    /**
+     * Get summary statistics from cohort data
+     */
+    static def getSummaryStats(def cohortData) {
+        if (!cohortData || cohortData.isEmpty()) return [:]
+        
+        def stats = [:]
+        stats.total_images = cohortData.size()
+        
+        // Scanner distribution
+        def scanners = cohortData.collect { it.scanner }.findAll { it }.countBy { it }
+        stats.scanners = scanners
+        
+        // Average dimensions
+        def widths = cohortData.collect { it.width_pixels }.findAll { it }
+        def heights = cohortData.collect { it.height_pixels }.findAll { it }
+        stats.avg_width = widths.sum() / widths.size()
+        stats.avg_height = heights.sum() / heights.size()
+        
+        // Pixel size statistics
+        def pixelSizes = cohortData.collect { it.pixel_width_um }.findAll { it && it > 0 }
+        if (pixelSizes) {
+            stats.avg_pixel_size = pixelSizes.sum() / pixelSizes.size()
+            stats.min_pixel_size = pixelSizes.min()
+            stats.max_pixel_size = pixelSizes.max()
+        }
+        
+        // File format distribution
+        def formats = cohortData.collect { it.file_extension }.findAll { it }.countBy { it }
+        stats.file_formats = formats
+        
+        return stats
     }
 }
 
@@ -520,8 +604,13 @@ println("Workflow completed. Use CohortUtils class methods for further analysis.
 
 // Example usage for filtering (uncomment to use):
 /*
-// Load the exported metadata
-def cohortData = CohortUtils.loadCohortMetadata("path/to/cohort_metadata.json")
+// Load the exported metadata from CSV
+def cohortData = CohortUtils.loadCohortMetadata("path/to/cohort_metadata.csv")
+
+// Get summary statistics
+def stats = CohortUtils.getSummaryStats(cohortData)
+println("Total images: ${stats.total_images}")
+println("Scanners: ${stats.scanners}")
 
 // Filter high-magnification images
 def highMagImages = CohortUtils.getImagesByMagnification(cohortData, 20, 40)
@@ -534,4 +623,8 @@ def largeImages = CohortUtils.filterImages(cohortData, [
     area_mm2: 100,  // minimum 100 mm²
     file_extension: "svs"
 ])
+
+println("Found ${highMagImages.size()} high magnification images")
+println("Found ${aperioImages.size()} Aperio images")
+println("Found ${largeImages.size()} large images")
 */

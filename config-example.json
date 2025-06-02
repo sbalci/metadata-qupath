@@ -1,0 +1,149 @@
+{
+    "version": "2.0.0",
+    "description": "Configuration file for QuPath Cohort Metadata Extractor",
+    "output_settings": {
+        "base_directory": "cohort_metadata",
+        "csv_filename": "cohort_metadata_v06.csv",
+        "summary_filename": "detailed_summary_v06.txt",
+        "log_filename": "processing_log.txt",
+        "include_processing_log": true,
+        "include_detailed_summary": true
+    },
+    "extraction_settings": {
+        "include_quality_metrics": true,
+        "include_scanner_metadata": true,
+        "include_file_system_info": true,
+        "include_pyramid_analysis": true,
+        "suggested_analysis_pixel_size_um": 1.0,
+        "calculate_physical_dimensions": true
+    },
+    "quality_thresholds": {
+        "min_image_area_mm2": 1.0,
+        "max_file_size_gb": 10.0,
+        "min_pyramid_levels": 2,
+        "min_compression_quality": 70,
+        "max_pixel_size_um": 2.0,
+        "min_pixel_size_um": 0.1
+    },
+    "scanner_mappings": {
+        "aperio": {
+            "manufacturers": [
+                "Aperio",
+                "Leica Biosystems"
+            ],
+            "models": [
+                "GT450",
+                "AT2",
+                "CS2",
+                "ScanScope"
+            ],
+            "expected_magnifications": [
+                20,
+                40
+            ],
+            "typical_pixel_sizes": [
+                0.25,
+                0.5
+            ]
+        },
+        "hamamatsu": {
+            "manufacturers": [
+                "Hamamatsu"
+            ],
+            "models": [
+                "NanoZoomer",
+                "C9600"
+            ],
+            "expected_magnifications": [
+                20,
+                40
+            ],
+            "typical_pixel_sizes": [
+                0.23,
+                0.46
+            ]
+        },
+        "ventana": {
+            "manufacturers": [
+                "Ventana",
+                "Roche"
+            ],
+            "models": [
+                "iScan",
+                "DP200"
+            ],
+            "expected_magnifications": [
+                20,
+                40
+            ],
+            "typical_pixel_sizes": [
+                0.25,
+                0.5
+            ]
+        },
+        "philips": {
+            "manufacturers": [
+                "Philips"
+            ],
+            "models": [
+                "IntelliSite",
+                "UFS"
+            ],
+            "expected_magnifications": [
+                20,
+                40
+            ],
+            "typical_pixel_sizes": [
+                0.25,
+                0.5
+            ]
+        }
+    },
+    "metadata_field_mapping": {
+        "required_fields": [
+            "image_name",
+            "width_pixels",
+            "height_pixels",
+            "pixel_width_um",
+            "estimated_magnification",
+            "has_pyramid",
+            "file_size_mb"
+        ],
+        "scanner_specific_fields": [
+            "scanner_type",
+            "scanscope_id",
+            "apparent_magnification",
+            "scan_date",
+            "scan_time",
+            "exposure_settings",
+            "compression_quality"
+        ],
+        "quality_fields": [
+            "scan_warning",
+            "compression_ratio",
+            "pyramid_factor",
+            "suggested_analysis_level"
+        ]
+    },
+    "error_handling": {
+        "continue_on_error": true,
+        "log_all_errors": true,
+        "skip_corrupted_images": true,
+        "max_errors_before_abort": 50,
+        "retry_failed_images": false
+    },
+    "performance_settings": {
+        "enable_progress_reporting": true,
+        "batch_size": 10,
+        "memory_optimization": true,
+        "parallel_processing": false
+    },
+    "export_options": {
+        "csv_encoding": "utf-8",
+        "csv_delimiter": ",",
+        "date_format": "yyyy-MM-dd HH:mm:ss",
+        "number_precision": 6,
+        "include_empty_fields": true,
+        "sort_output_by": "image_name"
+    }
+}

@@ -1,0 +1,54 @@
+{
+    "output_settings": {
+        "base_directory": "cohort_metadata",
+        "csv_filename": "cohort_metadata.csv",
+        "json_filename": "cohort_metadata.json",
+        "include_processing_log": true
+    },
+    "extraction_settings": {
+        "include_thumbnails": true,
+        "thumbnail_size": 512,
+        "include_quality_metrics": true,
+        "suggested_analysis_pixel_size": 1.0
+    },
+    "metadata_fields": {
+        "required_fields": [
+            "image_name",
+            "width_pixels",
+            "height_pixels",
+            "pixel_width_um",
+            "scanner",
+            "scan_date"
+        ],
+        "optional_fields": [
+            "magnification",
+            "compression",
+            "focus_method",
+            "file_size_mb",
+            "pyramid_levels"
+        ]
+    },
+    "quality_thresholds": {
+        "min_image_area_mm2": 1.0,
+        "max_file_size_gb": 5.0,
+        "required_pyramid_levels": 3
+    },
+    "scanner_mappings": {
+        "aperio": [
+            "Aperio",
+            "Leica"
+        ],
+        "hamamatsu": [
+            "Hamamatsu",
+            "NanoZoomer"
+        ],
+        "ventana": [
+            "Ventana",
+            "iScan"
+        ],
+        "philips": [
+            "Philips",
+            "IntelliSite"
+        ]
+    }
+}
