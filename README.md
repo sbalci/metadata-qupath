@@ -4,7 +4,14 @@
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Digital Pathology](https://img.shields.io/badge/Digital%20Pathology-Workflow-orange)
 
-A comprehensive metadata extraction toolkit for digital pathology research, designed to standardize cohort definition and image analysis workflows in QuPath.
+
+## Acknowledgments
+
+This project was developed with the assistance of [Claude](https://www.anthropic.com/claude), an AI assistant by Anthropic.
+
+[![Developed with Claude](https://img.shields.io/badge/🤖Developed%20with-Claude%20AI-orange)](https://www.anthropic.com/claude)
+
+**A comprehensive metadata extraction toolkit for digital pathology research, designed to standardize cohort definition and image analysis workflows in QuPath.**
 
 ## 🎯 Overview
 
